@@ -77,13 +77,15 @@
   <h2>Mikrofon</h2>
   <button class="big" id="micBtn">🎙️ Mikrofonu Aç</button>
   <div class="meter"><i id="meter"></i></div>
-  <label class="slider">🚀 Mikrofon gücü (sesin az geliyorsa artır) <b id="vBoost">4x</b></label>
-  <input type="range" id="boost" min="1" max="12" step="0.5" value="4">
+  <label class="slider">🚀 Mikrofon gücü (sesin az geliyorsa artır) <b id="vBoost">2.5x</b></label>
+  <input type="range" id="boost" min="1" max="12" step="0.5" value="2.5">
+  <label class="slider">🤫 Cızırtı kapısı (sessizken sesi keser) <b id="vGate">40%</b></label>
+  <input type="range" id="gate" min="0" max="100" value="40">
   <label class="slider">🎧 Hangi mikrofon?</label>
   <select id="micSel"><option value="">Varsayılan mikrofon</option></select>
   <div class="toggle">
-    <span>🛡️ Cızırtı önleyici <small style="color:var(--mute)">(ses geri dönerse aç)</small></span>
-    <input type="checkbox" id="aec">
+    <span>🛡️ Yankı/uğultu önleyici <small style="color:var(--mute)">(açık kalsın)</small></span>
+    <input type="checkbox" id="aec" checked>
   </div>
   <p class="hint">Önce telefonu Bluetooth hoparlöre bağla, sonra mikrofonu aç. Hoparlöre çok yaklaşma, "vııın" sesi yapar.<br>
   Ses yine az geliyorsa "Hangi mikrofon?" kısmından <b>iPhone Mikrofonu</b>'nu seç. Bazen hoparlörün kendi mikrofonu devreye giriyor.</p>
@@ -158,7 +160,7 @@
   const $ = id => document.getElementById(id);
   const player = $('player');
 
-  let ctx, master, preGain, limiter, micGain, musicGain, wetGain, echoGain, echoDelay, analyser, recDest, musicSrc;
+  let ctx, master, preGain, limiter, gateGain, gateAn, micGain, musicGain, wetGain, echoGain, echoDelay, analyser, recDest, musicSrc;
   let micStream = null, micNode = null, micChain = null;
   let recorder = null, recChunks = [];
   let wakeLock = null;
@@ -202,8 +204,11 @@
     preGain.connect(hp);
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -28; comp.ratio.value = 3; comp.attack.value = .005; comp.release.value = .25;
+    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 8000;
+    gateAn = ctx.createAnalyser(); gateAn.fftSize = 1024;
+    gateGain = ctx.createGain(); gateGain.gain.value = 0;
     micGain = ctx.createGain();
-    hp.connect(comp); comp.connect(micGain);
+    hp.connect(lp); lp.connect(comp); comp.connect(gateAn); comp.connect(gateGain); gateGain.connect(micGain);
     micChain = preGain;
 
     // Kuru ses
@@ -237,7 +242,7 @@
     try{
       micStream = await navigator.mediaDevices.getUserMedia({
         audio: Object.assign(
-          { echoCancellation: aec, noiseSuppression: false, autoGainControl: true },
+          { echoCancellation: aec, noiseSuppression: aec, autoGainControl: true },
           $('micSel').value ? { deviceId: { exact: $('micSel').value } } : {}
         )
       });
@@ -273,7 +278,17 @@
 
   function drawMeter(){
     const data = new Uint8Array(analyser.fftSize);
+    const gd = new Float32Array(gateAn.fftSize);
+    let lastOpen = 0, open = false;
     const loop = () => {
+      // Gürültü kapısı: ses eşiğin altındaysa mikrofonu kıs
+      gateAn.getFloatTimeDomainData(gd);
+      let sum = 0; for (const v of gd) sum += v*v;
+      const db = 10*Math.log10(sum/gd.length + 1e-12);
+      const thr = -75 + $('gate').value * 0.45;   // %0 = kapalı (-75dB), %100 = -30dB
+      const now = performance.now(), t = ctx.currentTime;
+      if ($('gate').value == 0 || db > thr){ lastOpen = now; if (!open){ open = true; gateGain.gain.setTargetAtTime(1, t, 0.005); } }
+      else if (open && now - lastOpen > 250){ open = false; gateGain.gain.setTargetAtTime(0, t, 0.06); }
       analyser.getByteTimeDomainData(data);
       let peak = 0;
       for (const v of data) peak = Math.max(peak, Math.abs(v-128));
@@ -289,6 +304,7 @@
     const m = $('micVol').value/100, mu = $('musicVol').value/100,
           r = $('revVol').value/100, e = $('echoVol').value/100, b = +$('boost').value;
     $('vBoost').textContent = b+'x';
+    $('vGate').textContent = $('gate').value+'%';
     $('vMic').textContent = Math.round(m*100)+'%';
     $('vMusic').textContent = Math.round(mu*100)+'%';
     $('vRev').textContent = Math.round(r*100)+'%';
@@ -301,7 +317,7 @@
     wetGain.gain.setTargetAtTime(r*0.9, t, .02);
     echoGain.gain.setTargetAtTime(e, t, .02);
   }
-  ['micVol','musicVol','revVol','echoVol','boost'].forEach(id => $(id).oninput = applyMixer);
+  ['micVol','musicVol','revVol','echoVol','boost','gate'].forEach(id => $(id).oninput = applyMixer);
   applyMixer();
 
   // ---------- MÜZİK ----------
