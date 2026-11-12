@@ -5,426 +5,119 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#120a24">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Cep Karaoke 🎤</title>
+<title>Cep Mikrofon 🎤</title>
 <style>
-  :root{
-    --bg:#120a24; --card:#1d1238; --card2:#26184a; --txt:#f3eefe; --mute:#a99bcf;
-    --pink:#ff3d9a; --cyan:#29e0ff; --yel:#ffd23f; --ok:#3dff8f; --bad:#ff4d4d;
-  }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;background:var(--bg);color:var(--txt);
+  html,body{margin:0;height:100%;background:#120a24;color:#f3eefe;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  body{padding:max(14px,env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
-    background:radial-gradient(circle at 20% 0%,#3a1670 0,transparent 55%),
-               radial-gradient(circle at 100% 30%,#0d3b5c 0,transparent 50%),var(--bg);
-    min-height:100vh}
-  h1{margin:4px 0 14px;font-size:26px;letter-spacing:.5px;text-align:center}
-  h1 span{background:linear-gradient(90deg,var(--pink),var(--cyan));-webkit-background-clip:text;
-    background-clip:text;color:transparent}
-  .card{background:var(--card);border-radius:18px;padding:14px;margin-bottom:12px;
-    box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06)}
-  .card h2{margin:0 0 10px;font-size:15px;color:var(--mute);font-weight:600;text-transform:uppercase;letter-spacing:1px}
-  button{font:inherit;border:0;border-radius:14px;padding:12px 14px;color:var(--txt);
-    background:var(--card2);cursor:pointer;font-weight:600}
-  button:active{transform:scale(.97)}
-  .big{width:100%;padding:18px;font-size:20px;border-radius:18px}
-  .mic-on{background:linear-gradient(135deg,var(--pink),#b51cff);box-shadow:0 0 24px rgba(255,61,154,.5)}
-  .row{display:flex;gap:8px;align-items:center}
-  .row>*{flex:1}
-  label.slider{display:block;margin:10px 0 2px;font-size:14px}
-  label.slider b{float:right;color:var(--cyan);font-weight:600}
-  input[type=range]{width:100%;accent-color:var(--pink);height:28px}
-  .meter{height:12px;border-radius:8px;background:#0b0618;overflow:hidden;margin-top:10px}
-  .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--yel),var(--bad));transition:width .05s}
-  .hint{font-size:13px;color:var(--mute);line-height:1.45;margin:8px 0 0}
-  .file{display:block;text-align:center;padding:14px;border:2px dashed #4a3a7a;border-radius:14px;color:var(--mute)}
-  .file input{display:none}
-  #songName{margin:8px 0;font-size:14px;color:var(--yel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--mute);flex:0 0 auto}
-  select{width:100%;margin-top:4px;padding:10px;border-radius:12px;border:1px solid #3a2a66;background:#0f0820;color:var(--txt);font:inherit;font-size:15px}
-  textarea{width:100%;min-height:110px;border-radius:12px;border:1px solid #3a2a66;background:#0f0820;
-    color:var(--txt);padding:10px;font:inherit;font-size:15px;resize:vertical}
-  .toggle{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px}
-  .toggle input{width:22px;height:22px;accent-color:var(--pink)}
-  .rec-on{background:var(--bad)!important;animation:blink 1s infinite}
-  @keyframes blink{50%{opacity:.6}}
-  #recList a{display:block;margin-top:8px;color:var(--cyan);font-size:14px}
-  #recList audio{width:100%;margin-top:6px}
-  /* Sahne modu */
-  #stage{position:fixed;inset:0;background:#000;z-index:10;display:none;flex-direction:column}
-  #stage.show{display:flex}
-  #lyricsBox{flex:1;overflow-y:auto;padding:45vh 22px;text-align:center;font-size:34px;line-height:1.5;font-weight:700;
-    scrollbar-width:none}
-  #lyricsBox::-webkit-scrollbar{display:none}
-  #lyricsBox p{margin:0 0 18px;color:#fff}
-  #stage .bar{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#0d0a18}
-  #stage .bar button{flex:1;padding:14px 6px;font-size:15px}
-  #stage .fade{position:absolute;left:0;right:0;height:30vh;pointer-events:none}
-  #stage .fade.t{top:0;background:linear-gradient(#000,transparent)}
-  #stage .fade.b{bottom:70px;background:linear-gradient(transparent,#000)}
-  #stageMeter{position:absolute;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;z-index:2}
-  .err{background:#4a1020;color:#ffd0d8;border-radius:12px;padding:10px;font-size:14px;margin-bottom:12px;display:none}
+  body{display:flex;flex-direction:column;justify-content:center;gap:22px;
+    padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom))}
+  h1{margin:0;text-align:center;font-size:28px}
+  #btn{width:100%;aspect-ratio:1;max-width:320px;margin:0 auto;border:0;border-radius:50%;
+    font:inherit;font-size:24px;font-weight:700;color:#fff;background:#2b1d52;
+    box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  #btn.on{background:linear-gradient(135deg,#ff3d9a,#b51cff);box-shadow:0 0 50px rgba(255,61,154,.6)}
+  .meter{height:14px;border-radius:8px;background:#0b0618;overflow:hidden}
+  .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3dff8f,#ffd23f,#ff4d4d)}
+  label{display:flex;justify-content:space-between;font-size:16px;margin-bottom:4px}
+  label b{color:#29e0ff}
+  input[type=range]{width:100%;accent-color:#ff3d9a;height:30px}
+  select{width:100%;padding:12px;border-radius:12px;border:1px solid #3a2a66;background:#0f0820;color:#f3eefe;font:inherit;font-size:15px}
+  p{margin:0;font-size:13px;color:#a99bcf;text-align:center;line-height:1.5}
+  #err{color:#ff8fa8}
 </style>
 </head>
 <body>
+  <h1>🎤 Cep Mikrofon</h1>
 
-<h1>🎤 <span>Cep Karaoke</span></h1>
-<div class="err" id="err"></div>
+  <button id="btn">Mikrofonu Aç</button>
 
-<!-- MİKROFON -->
-<div class="card">
-  <h2>Mikrofon</h2>
-  <button class="big" id="micBtn">🎙️ Mikrofonu Aç</button>
   <div class="meter"><i id="meter"></i></div>
-  <label class="slider">🚀 Mikrofon gücü (sesin az geliyorsa artır) <b id="vBoost">2.5x</b></label>
-  <input type="range" id="boost" min="1" max="12" step="0.5" value="2.5">
-  <label class="slider">🤫 Cızırtı kapısı (sessizken sesi keser) <b id="vGate">40%</b></label>
-  <input type="range" id="gate" min="0" max="100" value="40">
-  <label class="slider">🎧 Hangi mikrofon?</label>
-  <select id="micSel"><option value="">Varsayılan mikrofon</option></select>
-  <div class="toggle">
-    <span>🛡️ Yankı/uğultu önleyici <small style="color:var(--mute)">(açık kalsın)</small></span>
-    <input type="checkbox" id="aec" checked>
+
+  <div>
+    <label>🔊 Ses <b id="vVol">150%</b></label>
+    <input type="range" id="vol" min="0" max="400" value="150">
   </div>
-  <p class="hint">Önce telefonu Bluetooth hoparlöre bağla, sonra mikrofonu aç. Hoparlöre çok yaklaşma, "vııın" sesi yapar.<br>
-  Ses yine az geliyorsa "Hangi mikrofon?" kısmından <b>iPhone Mikrofonu</b>'nu seç. Bazen hoparlörün kendi mikrofonu devreye giriyor.</p>
-</div>
 
-<!-- MÜZİK -->
-<div class="card">
-  <h2>Müzik</h2>
-  <label class="file">🎵 Şarkı / altyapı seç (mp3, m4a…)
-    <input type="file" id="fileIn" accept="audio/*">
-  </label>
-  <div id="songName">Şarkı seçilmedi</div>
-  <div class="row">
-    <span class="time" id="tCur">0:00</span>
-    <input type="range" id="seek" min="0" max="100" step="0.1" value="0">
-    <span class="time" id="tDur">0:00</span>
+  <div>
+    <label>🎧 Mikrofon</label>
+    <select id="micSel"><option value="">Varsayılan</option></select>
   </div>
-  <div class="row" style="margin-top:8px">
-    <button id="playBtn">▶️ Çal</button>
-    <button id="restartBtn">⏮️ Baştan</button>
-  </div>
-</div>
 
-<!-- MİKSER -->
-<div class="card">
-  <h2>Mikser</h2>
-  <label class="slider">🎙️ Mikrofon sesi <b id="vMic">100%</b></label>
-  <input type="range" id="micVol" min="0" max="200" value="100">
-  <label class="slider">🎵 Müzik sesi <b id="vMusic">70%</b></label>
-  <input type="range" id="musicVol" min="0" max="150" value="70">
-  <label class="slider">✨ Yankı (sahne efekti) <b id="vRev">30%</b></label>
-  <input type="range" id="revVol" min="0" max="100" value="30">
-  <label class="slider">🔁 Eko (tekrar) <b id="vEcho">0%</b></label>
-  <input type="range" id="echoVol" min="0" max="80" value="0">
-</div>
-
-<!-- SÖZLER -->
-<div class="card">
-  <h2>Şarkı Sözleri</h2>
-  <textarea id="lyrics" placeholder="Şarkı sözlerini buraya yapıştır…"></textarea>
-  <button class="big" id="stageBtn" style="margin-top:10px">🎬 Sahne Moduna Geç</button>
-  <p class="hint">Sahne modunda sözler büyük yazıyla kendiliğinden akar, hızını sen ayarlarsın.</p>
-</div>
-
-<!-- KAYIT -->
-<div class="card">
-  <h2>Kayıt</h2>
-  <button class="big" id="recBtn">⏺️ Kaydı Başlat</button>
-  <div id="recList"></div>
-  <p class="hint">Kayda hem müzik hem senin sesin girer.</p>
-</div>
-
-<!-- SAHNE -->
-<div id="stage">
-  <div id="stageMeter" class="meter"><i id="meter2"></i></div>
-  <div class="fade t"></div>
-  <div id="lyricsBox"></div>
-  <div class="fade b"></div>
-  <div class="bar">
-    <button id="slower">🐢</button>
-    <button id="scrollBtn">⏸️ Durdur</button>
-    <button id="faster">🐇</button>
-    <button id="stagePlay">▶️</button>
-    <button id="exitStage">✖️</button>
-  </div>
-</div>
-
-<audio id="player" playsinline preload="auto"></audio>
+  <p>Önce telefonu Bluetooth hoparlöre bağla, sonra butona bas.<br>
+  Ses az geliyorsa listeden <b>iPhone Mikrofonu</b>'nu seç.</p>
+  <p id="err"></p>
 
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const player = $('player');
+  let ctx, gain, analyser, stream, src, wakeLock;
 
-  let ctx, master, preGain, limiter, gateGain, gateAn, micGain, musicGain, wetGain, echoGain, echoDelay, analyser, recDest, musicSrc;
-  let micStream = null, micNode = null, micChain = null;
-  let recorder = null, recChunks = [];
-  let wakeLock = null;
-
-  function showErr(msg){ const e=$('err'); e.textContent=msg; e.style.display='block'; setTimeout(()=>e.style.display='none',7000); }
-
-  // Yapay yankı için "oda sesi" üret
-  function makeImpulse(seconds = 2.4, decay = 3){
-    const rate = ctx.sampleRate, len = rate * seconds;
-    const buf = ctx.createBuffer(2, len, rate);
-    for (let c = 0; c < 2; c++){
-      const d = buf.getChannelData(c);
-      for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, decay);
-    }
-    return buf;
-  }
-
-  function initAudio(){
+  function setup(){
     if (ctx) return;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    ctx = new AC({ latencyHint: 'interactive' });
-
-    master = ctx.createGain();
-    limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20;
-    limiter.attack.value = .002; limiter.release.value = .1;
-    master.connect(limiter);
-    limiter.connect(ctx.destination);
-    recDest = ctx.createMediaStreamDestination();
-    limiter.connect(recDest);
-
-    // Müzik
-    musicGain = ctx.createGain();
-    musicGain.connect(master);
-    musicSrc = ctx.createMediaElementSource(player);
-    musicSrc.connect(musicGain);
-
-    // Mikrofon zinciri: bas kesici -> kompresör -> ses
-    preGain = ctx.createGain();
-    const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 110;
-    preGain.connect(hp);
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -28; comp.ratio.value = 3; comp.attack.value = .005; comp.release.value = .25;
-    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 8000;
-    gateAn = ctx.createAnalyser(); gateAn.fftSize = 1024;
-    gateGain = ctx.createGain(); gateGain.gain.value = 0;
-    micGain = ctx.createGain();
-    hp.connect(lp); lp.connect(comp); comp.connect(gateAn); comp.connect(gateGain); gateGain.connect(micGain);
-    micChain = preGain;
-
-    // Kuru ses
-    micGain.connect(master);
-
-    // Yankı
-    const conv = ctx.createConvolver(); conv.buffer = makeImpulse();
-    wetGain = ctx.createGain();
-    micGain.connect(conv); conv.connect(wetGain); wetGain.connect(master);
-
-    // Eko
-    echoDelay = ctx.createDelay(1.0); echoDelay.delayTime.value = 0.32;
-    const fb = ctx.createGain(); fb.gain.value = 0.35;
-    echoGain = ctx.createGain();
-    micGain.connect(echoDelay); echoDelay.connect(fb); fb.connect(echoDelay);
-    echoDelay.connect(echoGain); echoGain.connect(master);
-
-    // Seviye göstergesi
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    gain = ctx.createGain();
     analyser = ctx.createAnalyser(); analyser.fftSize = 512;
-    micGain.connect(analyser);
-
-    applyMixer();
-    drawMeter();
+    gain.connect(ctx.destination);
+    gain.connect(analyser);
+    setVol();
+    const d = new Uint8Array(analyser.fftSize);
+    (function meter(){
+      analyser.getByteTimeDomainData(d);
+      let p = 0; for (const v of d) p = Math.max(p, Math.abs(v - 128));
+      $('meter').style.width = Math.min(100, p / 128 * 140) + '%';
+      requestAnimationFrame(meter);
+    })();
   }
 
-  // ---------- MİKROFON ----------
-  async function startMic(){
-    initAudio();
+  async function start(){
+    setup();
     if (ctx.state === 'suspended') await ctx.resume();
-    const aec = $('aec').checked;
     try{
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: Object.assign(
-          { echoCancellation: aec, noiseSuppression: aec, autoGainControl: true },
-          $('micSel').value ? { deviceId: { exact: $('micSel').value } } : {}
-        )
-      });
-    }catch(e){
-      showErr('Mikrofona izin verilmedi. Tarayıcı ayarlarından mikrofon iznini aç. ('+e.name+')');
-      return;
-    }
-    micNode = ctx.createMediaStreamSource(micStream);
-    micNode.connect(micChain);
+      const id = $('micSel').value;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: Object.assign(
+        { echoCancellation: false, noiseSuppression: false, autoGainControl: true },
+        id ? { deviceId: { exact: id } } : {}
+      )});
+    }catch(e){ $('err').textContent = 'Mikrofon izni verilmedi (' + e.name + ')'; return; }
+    $('err').textContent = '';
+    src = ctx.createMediaStreamSource(stream);
+    src.connect(gain);
+    $('btn').textContent = 'Açık — Kapat';
+    $('btn').classList.add('on');
     listMics();
-    $('micBtn').textContent = '🔴 Mikrofon Açık — Kapat';
-    $('micBtn').classList.add('mic-on');
-    keepAwake();
+    try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
   }
-  function stopMic(){
-    if (micNode){ micNode.disconnect(); micNode = null; }
-    if (micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream = null; }
-    $('micBtn').textContent = '🎙️ Mikrofonu Aç';
-    $('micBtn').classList.remove('mic-on');
+
+  function stop(){
+    if (src){ src.disconnect(); src = null; }
+    if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+    $('btn').textContent = 'Mikrofonu Aç';
+    $('btn').classList.remove('on');
+    if (wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
   }
-  $('micBtn').onclick = () => micStream ? stopMic() : startMic();
+
   async function listMics(){
     try{
-      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
-      const sel = $('micSel'), cur = sel.value || (micStream && micStream.getAudioTracks()[0].getSettings().deviceId) || '';
-      sel.innerHTML = '<option value="">Varsayılan mikrofon</option>' +
-        devs.map((d,i) => `<option value="${d.deviceId}">${d.label || ('Mikrofon '+(i+1))}</option>`).join('');
+      const sel = $('micSel'), cur = sel.value || stream?.getAudioTracks()[0].getSettings().deviceId || '';
+      const mics = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+      sel.innerHTML = '<option value="">Varsayılan</option>' +
+        mics.map((m, i) => `<option value="${m.deviceId}">${m.label || 'Mikrofon ' + (i + 1)}</option>`).join('');
       if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
     }catch(e){}
   }
-  $('micSel').onchange = async () => { if (micStream){ stopMic(); await startMic(); } };
-  $('aec').onchange = async () => { if (micStream){ stopMic(); await startMic(); } };
 
-  function drawMeter(){
-    const data = new Uint8Array(analyser.fftSize);
-    const gd = new Float32Array(gateAn.fftSize);
-    let lastOpen = 0, open = false;
-    const loop = () => {
-      // Gürültü kapısı: ses eşiğin altındaysa mikrofonu kıs
-      gateAn.getFloatTimeDomainData(gd);
-      let sum = 0; for (const v of gd) sum += v*v;
-      const db = 10*Math.log10(sum/gd.length + 1e-12);
-      const thr = -75 + $('gate').value * 0.45;   // %0 = kapalı (-75dB), %100 = -30dB
-      const now = performance.now(), t = ctx.currentTime;
-      if ($('gate').value == 0 || db > thr){ lastOpen = now; if (!open){ open = true; gateGain.gain.setTargetAtTime(1, t, 0.005); } }
-      else if (open && now - lastOpen > 250){ open = false; gateGain.gain.setTargetAtTime(0, t, 0.06); }
-      analyser.getByteTimeDomainData(data);
-      let peak = 0;
-      for (const v of data) peak = Math.max(peak, Math.abs(v-128));
-      const pct = Math.min(100, peak/128*140) + '%';
-      $('meter').style.width = pct; $('meter2').style.width = pct;
-      requestAnimationFrame(loop);
-    };
-    loop();
+  function setVol(){
+    const v = $('vol').value / 100;
+    $('vVol').textContent = Math.round(v * 100) + '%';
+    if (gain) gain.gain.value = v;
   }
 
-  // ---------- MİKSER ----------
-  function applyMixer(){
-    const m = $('micVol').value/100, mu = $('musicVol').value/100,
-          r = $('revVol').value/100, e = $('echoVol').value/100, b = +$('boost').value;
-    $('vBoost').textContent = b+'x';
-    $('vGate').textContent = $('gate').value+'%';
-    $('vMic').textContent = Math.round(m*100)+'%';
-    $('vMusic').textContent = Math.round(mu*100)+'%';
-    $('vRev').textContent = Math.round(r*100)+'%';
-    $('vEcho').textContent = Math.round(e*100)+'%';
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    micGain.gain.setTargetAtTime(m, t, .02);
-    preGain.gain.setTargetAtTime(b, t, .02);
-    musicGain.gain.setTargetAtTime(mu, t, .02);
-    wetGain.gain.setTargetAtTime(r*0.9, t, .02);
-    echoGain.gain.setTargetAtTime(e, t, .02);
-  }
-  ['micVol','musicVol','revVol','echoVol','boost','gate'].forEach(id => $(id).oninput = applyMixer);
-  applyMixer();
+  $('btn').onclick = () => stream ? stop() : start();
+  $('vol').oninput = setVol;
+  $('micSel').onchange = async () => { if (stream){ stop(); await start(); } };
 
-  // ---------- MÜZİK ----------
-  const fmt = s => isFinite(s) ? Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0') : '0:00';
-  $('fileIn').onchange = e => {
-    const f = e.target.files[0]; if (!f) return;
-    initAudio();
-    if (player.src) URL.revokeObjectURL(player.src);
-    player.src = URL.createObjectURL(f);
-    $('songName').textContent = '🎶 ' + f.name.replace(/\.[^.]+$/,'');
-    setPlayIcons(false);
-  };
-  async function togglePlay(){
-    if (!player.src){ showErr('Önce bir şarkı seç.'); return; }
-    initAudio();
-    if (ctx.state === 'suspended') await ctx.resume();
-    if (player.paused){ await player.play().catch(err=>showErr('Çalınamadı: '+err.message)); }
-    else player.pause();
-  }
-  function setPlayIcons(playing){
-    $('playBtn').textContent = playing ? '⏸️ Durdur' : '▶️ Çal';
-    $('stagePlay').textContent = playing ? '⏸️' : '▶️';
-  }
-  player.onplay = () => setPlayIcons(true);
-  player.onpause = () => setPlayIcons(false);
-  player.onloadedmetadata = () => $('tDur').textContent = fmt(player.duration);
-  player.ontimeupdate = () => {
-    $('tCur').textContent = fmt(player.currentTime);
-    if (player.duration) $('seek').value = player.currentTime/player.duration*100;
-  };
-  $('seek').oninput = e => { if (player.duration) player.currentTime = e.target.value/100*player.duration; };
-  $('playBtn').onclick = togglePlay;
-  $('stagePlay').onclick = togglePlay;
-  $('restartBtn').onclick = () => { player.currentTime = 0; $('lyricsBox').scrollTop = 0; };
-
-  // ---------- SAHNE MODU ----------
-  let scrollSpeed = 0.6, scrolling = true, scrollPos = 0;
-  $('stageBtn').onclick = () => {
-    const lines = $('lyrics').value.split('\n');
-    const box = $('lyricsBox');
-    box.innerHTML = '';
-    if (!$('lyrics').value.trim()) box.innerHTML = '<p style="color:#888">Söz eklenmedi 🎤<br>Sadece söyle!</p>';
-    else lines.forEach(l => { const p = document.createElement('p'); p.textContent = l || ' '; box.appendChild(p); });
-    box.scrollTop = 0; scrollPos = 0;
-    $('stage').classList.add('show');
-    keepAwake();
-  };
-  $('exitStage').onclick = () => $('stage').classList.remove('show');
-  $('slower').onclick = () => scrollSpeed = Math.max(0.1, scrollSpeed - 0.15);
-  $('faster').onclick = () => scrollSpeed = Math.min(4, scrollSpeed + 0.15);
-  $('scrollBtn').onclick = () => {
-    scrolling = !scrolling;
-    $('scrollBtn').textContent = scrolling ? '⏸️ Durdur' : '▶️ Akıt';
-  };
-  const box = $('lyricsBox');
-  box.addEventListener('touchstart', () => { box.dataset.touch = 1; }, {passive:true});
-  box.addEventListener('touchend', () => { box.dataset.touch = ''; scrollPos = box.scrollTop; }, {passive:true});
-  (function autoScroll(){
-    if ($('stage').classList.contains('show') && scrolling && !box.dataset.touch){
-      scrollPos += scrollSpeed;
-      box.scrollTop = scrollPos;
-    }
-    requestAnimationFrame(autoScroll);
-  })();
-
-  // ---------- KAYIT ----------
-  function pickMime(){
-    const types = ['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg'];
-    return types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
-  }
-  $('recBtn').onclick = async () => {
-    if (!window.MediaRecorder){ showErr('Bu tarayıcı kayıt desteklemiyor.'); return; }
-    initAudio();
-    if (ctx.state === 'suspended') await ctx.resume();
-    if (recorder && recorder.state === 'recording'){ recorder.stop(); return; }
-    const mime = pickMime();
-    recChunks = [];
-    recorder = new MediaRecorder(recDest.stream, mime ? { mimeType: mime } : undefined);
-    recorder.ondataavailable = e => e.data.size && recChunks.push(e.data);
-    recorder.onstop = () => {
-      const type = recorder.mimeType || mime || 'audio/webm';
-      const blob = new Blob(recChunks, { type });
-      const url = URL.createObjectURL(blob);
-      const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
-      const name = 'karaoke-' + new Date().toLocaleTimeString('tr-TR').replace(/:/g,'-') + '.' + ext;
-      const wrap = document.createElement('div');
-      wrap.innerHTML = `<audio controls src="${url}"></audio><a href="${url}" download="${name}">⬇️ ${name} indir</a>`;
-      $('recList').prepend(wrap);
-      $('recBtn').textContent = '⏺️ Kaydı Başlat';
-      $('recBtn').classList.remove('rec-on');
-    };
-    recorder.start(1000);
-    $('recBtn').textContent = '⏹️ Kaydı Bitir';
-    $('recBtn').classList.add('rec-on');
-  };
-
-  // ---------- EKRAN KAPANMASIN ----------
-  async function keepAwake(){
-    try{ if ('wakeLock' in navigator && !wakeLock){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.onrelease = () => wakeLock = null; } }catch(e){}
-  }
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && (micStream || $('stage').classList.contains('show'))) keepAwake();
-  });
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    showErr('Mikrofon için sayfa https üzerinden açılmalı (GitHub Pages olur).');
-  }
+  if (!navigator.mediaDevices?.getUserMedia) $('err').textContent = 'Sayfa https üzerinden açılmalı.';
 })();
 </script>
 </body>
