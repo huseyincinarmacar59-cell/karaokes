@@ -42,6 +42,7 @@
   .file input{display:none}
   #songName{margin:8px 0;font-size:14px;color:var(--yel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--mute);flex:0 0 auto}
+  select{width:100%;margin-top:4px;padding:10px;border-radius:12px;border:1px solid #3a2a66;background:#0f0820;color:var(--txt);font:inherit;font-size:15px}
   textarea{width:100%;min-height:110px;border-radius:12px;border:1px solid #3a2a66;background:#0f0820;
     color:var(--txt);padding:10px;font:inherit;font-size:15px;resize:vertical}
   .toggle{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px}
@@ -76,11 +77,16 @@
   <h2>Mikrofon</h2>
   <button class="big" id="micBtn">🎙️ Mikrofonu Aç</button>
   <div class="meter"><i id="meter"></i></div>
+  <label class="slider">🚀 Mikrofon gücü (sesin az geliyorsa artır) <b id="vBoost">4x</b></label>
+  <input type="range" id="boost" min="1" max="12" step="0.5" value="4">
+  <label class="slider">🎧 Hangi mikrofon?</label>
+  <select id="micSel"><option value="">Varsayılan mikrofon</option></select>
   <div class="toggle">
     <span>🛡️ Cızırtı önleyici <small style="color:var(--mute)">(ses geri dönerse aç)</small></span>
     <input type="checkbox" id="aec">
   </div>
-  <p class="hint">Önce telefonu Bluetooth hoparlöre bağla, sonra mikrofonu aç. Hoparlöre çok yaklaşma, "vııın" sesi yapar.</p>
+  <p class="hint">Önce telefonu Bluetooth hoparlöre bağla, sonra mikrofonu aç. Hoparlöre çok yaklaşma, "vııın" sesi yapar.<br>
+  Ses yine az geliyorsa "Hangi mikrofon?" kısmından <b>iPhone Mikrofonu</b>'nu seç. Bazen hoparlörün kendi mikrofonu devreye giriyor.</p>
 </div>
 
 <!-- MÜZİK -->
@@ -152,7 +158,7 @@
   const $ = id => document.getElementById(id);
   const player = $('player');
 
-  let ctx, master, micGain, musicGain, wetGain, echoGain, echoDelay, analyser, recDest, musicSrc;
+  let ctx, master, preGain, limiter, micGain, musicGain, wetGain, echoGain, echoDelay, analyser, recDest, musicSrc;
   let micStream = null, micNode = null, micChain = null;
   let recorder = null, recChunks = [];
   let wakeLock = null;
@@ -176,9 +182,13 @@
     ctx = new AC({ latencyHint: 'interactive' });
 
     master = ctx.createGain();
-    master.connect(ctx.destination);
+    limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20;
+    limiter.attack.value = .002; limiter.release.value = .1;
+    master.connect(limiter);
+    limiter.connect(ctx.destination);
     recDest = ctx.createMediaStreamDestination();
-    master.connect(recDest);
+    limiter.connect(recDest);
 
     // Müzik
     musicGain = ctx.createGain();
@@ -187,12 +197,14 @@
     musicSrc.connect(musicGain);
 
     // Mikrofon zinciri: bas kesici -> kompresör -> ses
+    preGain = ctx.createGain();
     const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 110;
+    preGain.connect(hp);
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -22; comp.ratio.value = 4; comp.attack.value = .005; comp.release.value = .2;
+    comp.threshold.value = -28; comp.ratio.value = 3; comp.attack.value = .005; comp.release.value = .25;
     micGain = ctx.createGain();
     hp.connect(comp); comp.connect(micGain);
-    micChain = hp;
+    micChain = preGain;
 
     // Kuru ses
     micGain.connect(master);
@@ -224,7 +236,10 @@
     const aec = $('aec').checked;
     try{
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: aec, noiseSuppression: aec, autoGainControl: false, latency: 0 }
+        audio: Object.assign(
+          { echoCancellation: aec, noiseSuppression: false, autoGainControl: true },
+          $('micSel').value ? { deviceId: { exact: $('micSel').value } } : {}
+        )
       });
     }catch(e){
       showErr('Mikrofona izin verilmedi. Tarayıcı ayarlarından mikrofon iznini aç. ('+e.name+')');
@@ -232,6 +247,7 @@
     }
     micNode = ctx.createMediaStreamSource(micStream);
     micNode.connect(micChain);
+    listMics();
     $('micBtn').textContent = '🔴 Mikrofon Açık — Kapat';
     $('micBtn').classList.add('mic-on');
     keepAwake();
@@ -243,6 +259,16 @@
     $('micBtn').classList.remove('mic-on');
   }
   $('micBtn').onclick = () => micStream ? stopMic() : startMic();
+  async function listMics(){
+    try{
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+      const sel = $('micSel'), cur = sel.value || (micStream && micStream.getAudioTracks()[0].getSettings().deviceId) || '';
+      sel.innerHTML = '<option value="">Varsayılan mikrofon</option>' +
+        devs.map((d,i) => `<option value="${d.deviceId}">${d.label || ('Mikrofon '+(i+1))}</option>`).join('');
+      if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+    }catch(e){}
+  }
+  $('micSel').onchange = async () => { if (micStream){ stopMic(); await startMic(); } };
   $('aec').onchange = async () => { if (micStream){ stopMic(); await startMic(); } };
 
   function drawMeter(){
@@ -261,7 +287,8 @@
   // ---------- MİKSER ----------
   function applyMixer(){
     const m = $('micVol').value/100, mu = $('musicVol').value/100,
-          r = $('revVol').value/100, e = $('echoVol').value/100;
+          r = $('revVol').value/100, e = $('echoVol').value/100, b = +$('boost').value;
+    $('vBoost').textContent = b+'x';
     $('vMic').textContent = Math.round(m*100)+'%';
     $('vMusic').textContent = Math.round(mu*100)+'%';
     $('vRev').textContent = Math.round(r*100)+'%';
@@ -269,11 +296,12 @@
     if (!ctx) return;
     const t = ctx.currentTime;
     micGain.gain.setTargetAtTime(m, t, .02);
+    preGain.gain.setTargetAtTime(b, t, .02);
     musicGain.gain.setTargetAtTime(mu, t, .02);
     wetGain.gain.setTargetAtTime(r*0.9, t, .02);
     echoGain.gain.setTargetAtTime(e, t, .02);
   }
-  ['micVol','musicVol','revVol','echoVol'].forEach(id => $(id).oninput = applyMixer);
+  ['micVol','musicVol','revVol','echoVol','boost'].forEach(id => $(id).oninput = applyMixer);
   applyMixer();
 
   // ---------- MÜZİK ----------
