@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from './vendor/RoundedBoxGeometry.js';
 
 // ---------------------------------------------------------------- veriler
 const ITEMS = {
@@ -13,9 +14,9 @@ const ITEMS = {
   cake:   { n: 'Kek',      e: '🍰', p: 95 },
 };
 const CROPS = {
-  wheat:  { cost: 2, time: 20, xp: 1, lvl: 1, color: 0xe8c64a },
-  corn:   { cost: 4, time: 45, xp: 2, lvl: 2, color: 0x7cc23c },
-  carrot: { cost: 7, time: 90, xp: 3, lvl: 3, color: 0xf08a2c },
+  wheat:  { cost: 2, time: 20, xp: 1, lvl: 1, color: 0xffd23f },
+  corn:   { cost: 4, time: 45, xp: 2, lvl: 2, color: 0xffe14a },
+  carrot: { cost: 7, time: 90, xp: 3, lvl: 3, color: 0xff8a2c },
 };
 const PENS = {
   coop: { n: 'Kümes', e: '🐔', lvl: 1, cost: 0,   feed: { wheat: 3 }, time: 60,  out: 'egg',  qty: 3, xp: 4 },
@@ -101,49 +102,94 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9fd8f5);
-scene.fog = new THREE.Fog(0x9fd8f5, 45, 95);
+scene.background = new THREE.Color(0xaee4fb);
+scene.fog = new THREE.Fog(0xaee4fb, 50, 100);
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x88aa55, 1.5));
-const sun = new THREE.DirectionalLight(0xfff2d0, 2.2);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xbfe6a0, 1.9));
+const sun = new THREE.DirectionalLight(0xfff4dc, 1.7);
 sun.position.set(18, 30, 12); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.radius = 4;
 Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 80 });
 scene.add(sun, sun.target);
 
+// yumuşak çizgi film gölgelendirmesi
+const ramp = new THREE.DataTexture(new Uint8Array([150, 205, 240, 255]), 4, 1, THREE.RedFormat);
+ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
+const toon = (c, extra) => new THREE.MeshToonMaterial(Object.assign({ color: c, gradientMap: ramp }, extra));
 const mats = {};
-const mat = (c) => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c }));
+const mat = (c) => mats[c] || (mats[c] = toon(c));
 function mesh(geo, color, x = 0, y = 0, z = 0, parent = scene) {
   const m = new THREE.Mesh(geo, typeof color === 'number' ? mat(color) : color);
   m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
 }
-const box = (w, h, d, c, x, y, z, p) => mesh(new THREE.BoxGeometry(w, h, d), c, x, y, z, p);
-const cyl = (r1, r2, h, c, x, y, z, p, seg = 12) => mesh(new THREE.CylinderGeometry(r1, r2, h, seg), c, x, y, z, p);
-const ball = (r, c, x, y, z, p) => mesh(new THREE.SphereGeometry(r, 12, 10), c, x, y, z, p);
+const geos = {};
+function box(w, h, d, c, x, y, z, p, r) { // yuvarlak köşeli kutu
+  const rad = Math.min(r === undefined ? 0.22 : r, Math.min(w, h, d) * 0.48), k = `${w},${h},${d},${rad}`;
+  return mesh(geos[k] || (geos[k] = new RoundedBoxGeometry(w, h, d, 3, rad)), c, x, y, z, p);
+}
+const cyl = (r1, r2, h, c, x, y, z, p, seg = 18) => mesh(new THREE.CylinderGeometry(r1, r2, h, seg), c, x, y, z, p);
+const ballGeo = new THREE.SphereGeometry(1, 20, 14);
+function ball(r, c, x, y, z, p) { const m = mesh(ballGeo, c, x, y, z, p); m.scale.setScalar(r); return m; }
+const cap = (r, len, c, x, y, z, p) => mesh(new THREE.CapsuleGeometry(r, len, 6, 12), c, x, y, z, p);
 function group(x, z, parent = scene) { const g = new THREE.Group(); g.position.set(x, 0, z); parent.add(g); return g; }
-function roof(w, h, d, c, y, p) { // dört yüzlü çatı
-  const m = mesh(new THREE.ConeGeometry(0.71, h, 4), c, 0, y + h / 2, 0, p);
-  m.rotation.y = Math.PI / 4; m.scale.set(w * 1.08, 1, d * 1.08); return m;
+const domeGeo = new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+function roof(w, h, d, c, y, p) { // tombul kubbe çatı
+  box(w + 0.7, 0.35, d + 0.7, c, 0, y + 0.05, 0, p, 0.17);
+  const m = mesh(domeGeo, c, 0, y + 0.15, 0, p); m.scale.set(w * 1.12, h * 1.7, d * 1.12); return m;
+}
+function eyes(p, y, z, gap, r = 0.07) {
+  for (const x of [-gap, gap]) { ball(r, 0x2a2018, x, y, z, p).castShadow = false; ball(r * 0.4, 0xffffff, x + r * 0.3, y + r * 0.35, z + r * 0.75, p).castShadow = false; }
 }
 
 // zemin, yollar, dere
-const ground = mesh(new THREE.PlaneGeometry(220, 220), 0x7fc24e, 0, 0, 0); ground.rotation.x = -Math.PI / 2; ground.castShadow = false;
+const ground = mesh(new THREE.PlaneGeometry(220, 220), 0x9bd96a, 0, 0, 0); ground.rotation.x = -Math.PI / 2; ground.castShadow = false;
 function flat(w, d, c, x, z, y = 0.02) { const m = mesh(new THREE.PlaneGeometry(w, d), c, x, y, z); m.rotation.x = -Math.PI / 2; m.castShadow = false; return m; }
-flat(3, 20, 0xd9b87a, 0, 10.5);         // evden kapıya ana yol
-flat(34, 2.4, 0xd9b87a, 0, 4.6, 0.025);   // ağıllar ile atölyeler arası yol
-flat(70, 4, 0xc9a66b, 0, 23, 0.02);   // köy yolu
-flat(7, 80, 0x4aa9e0, 31, 0, 0.03);   // dere
-flat(9, 80, 0xe3d29a, 31, 0, 0.015);  // kumsal
-const dock = group(27.5, 6); box(5, 0.25, 2, 0x9a6a3a, 0, 0.45, 0, dock);
-for (const dx of [-2, 2]) for (const dz of [-0.8, 0.8]) cyl(0.14, 0.14, 1, 0x6e4a26, dx, 0.3, dz, dock, 6);
+flat(3, 20, 0xf0d9a0, 0, 10.5);         // evden kapıya ana yol
+flat(34, 2.4, 0xf0d9a0, 0, 4.6, 0.025);   // ağıllar ile atölyeler arası yol
+flat(70, 4, 0xe6c88c, 0, 23, 0.02);   // köy yolu
+flat(7, 80, 0x6fd0f5, 31, 0, 0.03);   // dere
+flat(9, 80, 0xf7e9b8, 31, 0, 0.015);  // kumsal
+const dock = group(27.5, 6); box(5, 0.3, 2, 0xd9a86a, 0, 0.45, 0, dock);
+for (const dx of [-2, 2]) for (const dz of [-0.8, 0.8]) cap(0.14, 0.8, 0xb9794a, dx, 0.3, dz, dock);
 
 const colliders = []; // {x,z,r}
 function tree(x, z, s = 1) {
   const g = group(x, z); g.scale.setScalar(s);
-  cyl(0.25, 0.35, 1.6, 0x7a5230, 0, 0.8, 0, g, 7);
-  ball(1.3, 0x3f9a3a, 0, 2.5, 0, g); ball(0.95, 0x55b548, 0.6, 3.3, 0.2, g);
+  cyl(0.28, 0.42, 1.7, 0xa9774a, 0, 0.85, 0, g);
+  const fruit = Math.random() < 0.5;
+  [[0, 2.7, 0, 1.45, 0x6cc85a], [0.9, 2.3, 0.3, 1.0, 0x5dbb4e], [-0.9, 2.4, -0.2, 1.05, 0x7fd66a], [0.1, 3.6, 0.1, 0.95, 0x7fd66a], [-0.2, 2.3, 0.9, 0.9, 0x5dbb4e]]
+    .forEach(([a, b2, c, r, col]) => ball(r, col, a, b2, c, g));
+  if (fruit) [[0.9, 2.9, 1.0], [-0.7, 3.2, 0.9], [1.3, 2.2, 0.4], [-1.2, 2.1, 0.6], [0.2, 2.0, 1.4]].forEach(([a, b2, c]) => ball(0.17, 0xf0564a, a, b2, c, g));
   colliders.push({ x, z, r: 0.6 * s });
+}
+function bush(x, z, s = 1) {
+  const g = group(x, z); g.scale.setScalar(s);
+  ball(0.7, 0x6cc85a, 0, 0.5, 0, g); ball(0.5, 0x7fd66a, 0.55, 0.4, 0.1, g); ball(0.45, 0x5dbb4e, -0.5, 0.35, 0.2, g);
+}
+function flower(x, z, col) {
+  const g = group(x, z);
+  cyl(0.03, 0.03, 0.35, 0x5dbb4e, 0, 0.17, 0, g, 5).castShadow = false;
+  for (let i = 0; i < 5; i++) ball(0.09, col, Math.cos(i * 1.257) * 0.1, 0.38, Math.sin(i * 1.257) * 0.1, g).castShadow = false;
+  ball(0.07, 0xffe36a, 0, 0.4, 0, g).castShadow = false;
+}
+function rock(x, z, s) { const m = ball(s, 0xcfd3d8, x, s * 0.45, z); m.scale.set(s * 1.3, s * 0.8, s); }
+{ // rastgele ama sabit süsler
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const cols = [0xff8fb3, 0xffffff, 0xffd24a, 0xc79bff, 0xff7a6a];
+  const busy = (x, z) => (Math.abs(x) < 8 && z > -11 && z < 0) || Math.abs(x) < 2.2 || (Math.abs(z - 4.6) < 1.8) ||
+    (x < -11 && x > -21 && z > -11 && z < 17) || (x > 13 && z > -10 && z < 16 && x < 21) || (z < -11 && Math.abs(x) < 14) || (x > 26 && x < 36) || (z > 20.5 && z < 25.5);
+  for (let i = 0; i < 150; i++) { const x = rnd() * 76 - 38, z = rnd() * 66 - 30; if (!busy(x, z)) flower(x, z, cols[i % 5]); }
+  for (let i = 0; i < 26; i++) { const x = rnd() * 76 - 38, z = rnd() * 66 - 30; if (!busy(x, z) && (Math.abs(x) > 22 || Math.abs(z) > 18)) bush(x, z, 0.8 + rnd() * 0.6); }
+  for (let i = 0; i < 14; i++) { const x = rnd() * 76 - 38, z = rnd() * 66 - 30; if (!busy(x, z)) rock(x, z, 0.25 + rnd() * 0.3); }
+  for (let i = 0; i < 16; i++) { const m = flat(1, 1, 0xa8e274, rnd() * 70 - 35, rnd() * 60 - 28, 0.012); m.geometry = new THREE.CircleGeometry(1.5 + rnd() * 2.5, 20); }
+}
+const clouds = [];
+for (let i = 0; i < 9; i++) {
+  const g = group(-60 + i * 15, -40 + ((i * 37) % 80)); g.position.y = 20 + (i % 3) * 4;
+  const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
+  [[0, 0, 0, 2.6], [2.4, -0.3, 0.3, 1.9], [-2.3, -0.4, 0, 1.8], [0.8, 0.9, -0.4, 1.8]].forEach(([a, b2, c, r]) => { const m = ball(r, cm, a, b2, c, g); m.castShadow = m.receiveShadow = false; });
+  clouds.push(g);
 }
 [[-21, -17, 1.2], [-17, -19, 1], [20, -18, 1.3], [16, -19.5, .9], [-22, 17, 1.1], [22, 17, 1], [-23, 4, 1.2], [23, -9, 1],
  [-27, -8, 1.4], [-28, 10, 1.2], [9, -19, 1], [-4, 27, 1.2], [12, 28, 1.3], [-16, 28, 1], [24, 27, 1.1], [36, -12, 1.3], [37, 8, 1.1], [36, 22, 1.2]]
@@ -151,11 +197,11 @@ function tree(x, z, s = 1) {
 
 // sınır çiti (güney tarafta kapı boşluğu)
 const BX = 24.5, BZ = 20.5;
-function fence(x1, z1, x2, z2, c = 0xf3ead2) {
+function fence(x1, z1, x2, z2, c = 0xfff6e0) {
   const len = Math.hypot(x2 - x1, z2 - z1), n = Math.max(1, Math.round(len / 1.6));
   const g = group((x1 + x2) / 2, (z1 + z2) / 2); g.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-  for (const y of [0.4, 0.8]) box(len, 0.1, 0.07, c, 0, y, 0, g);
-  for (let i = 0; i <= n; i++) box(0.14, 1.05, 0.14, c, -len / 2 + (len * i) / n, 0.52, 0, g);
+  for (const y of [0.45, 0.85]) box(len, 0.13, 0.1, c, 0, y, 0, g);
+  for (let i = 0; i <= n; i++) cap(0.1, 0.9, c, -len / 2 + (len * i) / n, 0.55, 0, g);
 }
 fence(-BX, -BZ, BX, -BZ); fence(-BX, -BZ, -BX, BZ); fence(BX, -BZ, BX, BZ);
 fence(-BX, BZ, -2.5, BZ); fence(2.5, BZ, BX, BZ);
@@ -163,20 +209,23 @@ fence(-BX, BZ, -2.5, BZ); fence(2.5, BZ, BX, BZ);
 // çiftlik evi
 {
   const g = group(0, -15);
-  box(7, 3.4, 5, 0xfbe9c2, 0, 1.7, 0, g); roof(7, 2.6, 5, 0xc0503a, 3.4, g);
-  box(1.2, 2, 0.15, 0x8a5a2b, 0, 1, 2.52, g);
-  for (const x of [-2.2, 2.2]) box(1.2, 1.1, 0.15, 0x8ad0f0, x, 2, 2.52, g);
-  box(0.8, 1.6, 0.8, 0xb0745a, 2, 5, -0.8, g);
-  box(3, 0.2, 1.4, 0xb98b55, 0, 0.1, 3.2, g);
+  box(7, 3.4, 5, 0xfff1cf, 0, 1.7, 0, g, 0.7); roof(7, 2.4, 5, 0xff7d6a, 3.3, g);
+  box(1.3, 2.1, 0.3, 0xb9794a, 0, 1.05, 2.42, g, 0.6); ball(0.08, 0xffd24a, 0.4, 1.05, 2.6, g);
+  for (const x of [-2.2, 2.2]) {
+    box(1.4, 1.3, 0.3, 0xffffff, x, 2, 2.4, g, 0.5); box(1.05, 0.95, 0.3, 0x9be0ff, x, 2, 2.46, g, 0.4); box(1.5, 0.3, 0.5, 0xb9794a, x, 1.25, 2.6, g);
+    [0xff8fb3, 0xffd24a, 0xff7a6a].forEach((col, q) => ball(0.16, col, x + (q - 1) * 0.4, 1.5, 2.65, g));
+  }
+  box(0.9, 1.6, 0.9, 0xe8a58a, 2, 5.6, -0.8, g);
+  box(3.2, 0.25, 1.6, 0xd9a86a, 0, 0.12, 3.2, g);
   colliders.push({ x: -2, z: -15, r: 3 }, { x: 2, z: -15, r: 3 });
 }
 // ambar + silo
 {
   const g = group(-10, -14.5);
-  box(5, 3.2, 4.4, 0xc9463c, 0, 1.6, 0, g); roof(5, 2.2, 4.4, 0x6b4a3a, 3.2, g);
-  box(2, 2.3, 0.15, 0xfbe9c2, 0, 1.15, 2.22, g);
-  box(1.9, 0.12, 0.2, 0xc9463c, 0, 1.15, 2.26, g).rotation.z = 0.87;
-  cyl(1.2, 1.2, 4.5, 0xd8dde0, 4.2, 2.25, 0, g); mesh(new THREE.ConeGeometry(1.35, 1.2, 12), 0xc9463c, 4.2, 5.1, 0, g);
+  box(5, 3.2, 4.4, 0xf2665a, 0, 1.6, 0, g, 0.6); roof(5, 2.1, 4.4, 0xfff1cf, 3.1, g);
+  box(2.1, 2.3, 0.3, 0xfff1cf, 0, 1.15, 2.12, g, 0.4); box(1.7, 1.9, 0.3, 0xd9544a, 0, 1.15, 2.18, g, 0.3);
+  cyl(1.2, 1.2, 4.5, 0xeef2f5, 4.2, 2.25, 0, g, 24); const sd = mesh(domeGeo, 0xf2665a, 4.2, 4.5, 0, g); sd.scale.set(2.6, 2.2, 2.6);
+  for (const y of [1.2, 2.4, 3.6]) cyl(1.23, 1.23, 0.12, 0xcfd6dc, 4.2, y, 0, g, 24);
   colliders.push({ x: -10, z: -14.5, r: 3.1 }, { x: -5.8, z: -14.5, r: 1.5 });
 }
 
@@ -185,19 +234,26 @@ const things = []; // {x,z,r,h,label(),action()}
 
 // tarlalar
 const plotMeshes = [];
-const soilMat = new THREE.MeshLambertMaterial({ color: 0x8a5a33 });
+const PLANT = {
+  wheat:  { stem: 1.0, hy: 1.05, hs: [0.13, 0.3, 0.13] },
+  corn:   { stem: 1.4, hy: 0.85, hs: [0.16, 0.34, 0.16] },
+  carrot: { stem: 0.45, hy: 0.1, hs: [0.2, 0.24, 0.2] },
+};
 for (let i = 0; i < COLS * ROWS; i++) {
   const c = i % COLS, r = Math.floor(i / COLS);
-  const x = (c - 1.5) * 3 - 6.5 + 6.5, z = -8 + r * 3;
+  const x = (c - 1.5) * 3, z = -8 + r * 3;
   const g = group(x, z);
-  const soil = box(2.5, 0.16, 2.5, soilMat.clone(), 0, 0.08, 0, g);
+  const soil = box(2.6, 0.3, 2.6, toon(0xb5784a), 0, 0.08, 0, g, 0.15);
+  const furrows = new THREE.Group(); g.add(furrows);
+  for (const fx of [-0.75, 0, 0.75]) { const f = cap(0.2, 1.9, 0x9a6238, fx, 0.2, 0, furrows); f.rotation.x = Math.PI / 2; f.castShadow = false; }
   const plants = new THREE.Group(); g.add(plants);
   for (let a = 0; a < 9; a++) {
-    const pm = mesh(new THREE.ConeGeometry(0.2, 1, 6), new THREE.MeshLambertMaterial({ color: 0x66bb44 }),
-      (a % 3 - 1) * 0.75, 0.6, (Math.floor(a / 3) - 1) * 0.75, plants);
-    pm.userData.ph = a * 0.7;
+    const pg = new THREE.Group(); pg.position.set((a % 3 - 1) * 0.75, 0.3, (Math.floor(a / 3) - 1) * 0.75); plants.add(pg);
+    pg.userData = { ph: a * 0.7, stem: cap(0.07, 1, 0x6fcf52, 0, 0.5, 0, pg), leaf: ball(0.2, 0x6fcf52, 0, 0.3, 0, pg), head: ball(1, toon(0xffffff), 0, 1, 0, pg) };
+    pg.userData.leaf.scale.set(0.34, 0.12, 0.16);
   }
-  const sign = box(0.9, 0.5, 0.08, 0xf3ead2, 0, 0.9, 0, g); box(0.1, 0.9, 0.1, 0x8a5a2b, 0, 0.45, 0, g);
+  const sign = new THREE.Group(); g.add(sign); sign.userData.furrows = furrows;
+  cap(0.07, 0.7, 0xb9794a, 0, 0.45, 0, sign); box(1.1, 0.6, 0.14, 0xfff6e0, 0, 0.95, 0, sign);
   plotMeshes.push({ soil, plants, sign, g });
   things.push({
     x, z, r: 1.7, h: 1.9,
@@ -249,43 +305,48 @@ function harvest(i) {
 const animals = [];
 function chicken(pen) {
   const g = group(0, 0, pen);
-  ball(0.32, 0xffffff, 0, 0.42, 0, g).scale.set(1, 0.9, 1.25);
-  ball(0.19, 0xffffff, 0, 0.75, 0.3, g);
-  mesh(new THREE.ConeGeometry(0.07, 0.18, 6), 0xf0a020, 0, 0.74, 0.52, g).rotation.x = Math.PI / 2;
-  box(0.06, 0.14, 0.2, 0xd83a2a, 0, 0.95, 0.3, g);
-  for (const x of [-0.1, 0.1]) cyl(0.03, 0.03, 0.22, 0xf0a020, x, 0.11, 0, g, 5);
+  ball(0.4, 0xffffff, 0, 0.5, 0, g).scale.set(0.4, 0.38, 0.46);
+  ball(0.27, 0xffffff, 0, 0.92, 0.22, g); eyes(g, 0.97, 0.44, 0.11, 0.05);
+  const bk = mesh(new THREE.ConeGeometry(0.08, 0.16, 10), 0xffb02e, 0, 0.88, 0.5, g); bk.rotation.x = Math.PI / 2;
+  ball(0.09, 0xff5a4a, 0, 1.2, 0.2, g); ball(0.07, 0xff5a4a, 0, 1.16, 0.08, g); ball(0.06, 0xff5a4a, 0, 0.78, 0.46, g);
+  for (const x of [-0.36, 0.36]) ball(0.2, 0xf4f0e6, x, 0.52, -0.02, g).scale.set(0.08, 0.2, 0.26);
+  ball(0.16, 0xf4f0e6, 0, 0.72, -0.4, g);
+  for (const x of [-0.13, 0.13]) { cyl(0.03, 0.03, 0.2, 0xffb02e, x, 0.1, 0, g, 6); ball(0.07, 0xffb02e, x, 0.03, 0.05, g).scale.set(0.09, 0.03, 0.12); }
   return g;
 }
 function cow(pen) {
   const g = group(0, 0, pen);
-  box(0.9, 0.8, 1.6, 0xffffff, 0, 1.05, 0, g);
-  box(0.92, 0.4, 0.5, 0x2c2c2c, 0, 1.2, -0.3, g); box(0.5, 0.82, 0.4, 0x2c2c2c, 0.22, 1.05, 0.45, g);
-  box(0.6, 0.6, 0.6, 0xffffff, 0, 1.4, 1.0, g); box(0.5, 0.3, 0.2, 0xf2b6b0, 0, 1.25, 1.32, g);
-  for (const x of [-0.33, 0.33]) box(0.1, 0.22, 0.1, 0xe8dcc0, x, 1.78, 0.95, g);
-  for (const x of [-0.3, 0.3]) for (const z of [-0.6, 0.6]) box(0.2, 0.7, 0.2, 0xf2f2f2, x, 0.35, z, g);
+  const body = cap(0.62, 0.9, 0xffffff, 0, 1.1, 0, g); body.rotation.x = Math.PI / 2;
+  [[0.45, 1.4, -0.3, 0.36], [-0.5, 1.2, 0.25, 0.3], [0.2, 1.62, 0.35, 0.26], [-0.3, 1.5, -0.6, 0.25]].forEach(([a, b2, c, r]) => ball(r, 0x4a4040, a, b2, c, g).scale.set(r, r, r * 1.2));
+  box(0.9, 0.85, 0.8, 0xffffff, 0, 1.6, 1.15, g, 0.38); box(0.7, 0.42, 0.4, 0xffb8c2, 0, 1.4, 1.52, g, 0.2);
+  for (const x of [-0.14, 0.14]) ball(0.05, 0xe08a98, x, 1.42, 1.73, g);
+  eyes(g, 1.75, 1.55, 0.22, 0.08);
+  for (const x of [-0.3, 0.3]) { cap(0.06, 0.16, 0xfff1cf, x, 2.1, 1.1, g); ball(0.16, 0x4a4040, x * 1.9, 1.85, 1.05, g).scale.set(0.2, 0.11, 0.08); }
+  for (const x of [-0.33, 0.33]) for (const z of [-0.55, 0.55]) { cap(0.14, 0.4, 0xffffff, x, 0.38, z, g); ball(0.16, 0x4a4040, x, 0.1, z, g).scale.set(0.16, 0.1, 0.17); }
+  const tail = cap(0.04, 0.6, 0xffffff, 0, 1.2, -1.1, g); tail.rotation.x = -0.4; ball(0.1, 0x4a4040, 0, 0.85, -1.22, g);
   return g;
 }
 function makePen(key, x, z, w, d, count, maker, hutColor) {
   const P = PENS[key];
   const g = group(x, z);
-  flat(w, d, 0xc8b47a, x, z, 0.03);
-  const hw = w / 2, hd = d / 2, col = 0x9a6a3a;
+  flat(w, d, 0xf0dca0, x, z, 0.03);
+  const hw = w / 2, hd = d / 2, col = 0xd9a86a;
   const lf = (a, b, c2, e) => { // yerel çit
     const len = Math.hypot(c2 - a, e - b); const f = new THREE.Group(); f.position.set((a + c2) / 2, 0, (b + e) / 2);
     f.rotation.y = -Math.atan2(e - b, c2 - a); g.add(f);
-    for (const y of [0.35, 0.7]) box(len, 0.09, 0.07, col, 0, y, 0, f);
-    const n = Math.round(len / 1.4); for (let i = 0; i <= n; i++) box(0.13, 0.9, 0.13, col, -len / 2 + (len * i) / n, 0.45, 0, f);
+    for (const y of [0.4, 0.75]) box(len, 0.12, 0.1, col, 0, y, 0, f);
+    const n = Math.round(len / 1.4); for (let i = 0; i <= n; i++) cap(0.1, 0.75, col, -len / 2 + (len * i) / n, 0.47, 0, f);
   };
   lf(-hw, -hd, hw, -hd); lf(-hw, -hd, -hw, hd); lf(-hw, hd, hw, hd); lf(hw, -hd, hw, -0.9); lf(hw, 0.9, hw, hd);
   const hut = group(-hw + 1.3, -hd + 1.2, g);
-  box(2, 1.5, 1.8, hutColor, 0, 0.75, 0, hut); roof(2, 1, 1.8, 0x8a5a2b, 1.5, hut);
-  const trough = box(1.6, 0.3, 0.5, 0x7a5230, 0.8, 0.15, hd - 0.7, g);
+  box(2, 1.5, 1.8, hutColor, 0, 0.75, 0, hut, 0.4); roof(2, 0.9, 1.8, 0xff7d6a, 1.45, hut); box(0.7, 0.9, 0.2, 0x7a4a2a, 0.3, 0.45, 0.85, hut, 0.3);
+  const trough = box(1.7, 0.4, 0.6, 0xb9794a, 0.8, 0.2, hd - 0.7, g); box(1.4, 0.1, 0.36, 0xffe08a, 0, 0.18, 0, trough, 0.05);
   const herd = new THREE.Group(); g.add(herd);
   for (let i = 0; i < count; i++) {
     const a = maker(herd); a.position.set((Math.random() - 0.5) * (w - 2.5), 0, (Math.random() - 0.3) * (d - 3));
     animals.push({ m: a, key, w: w - 2.5, d: d - 3, tx: a.position.x, tz: a.position.z, wait: Math.random() * 3, sp: key === 'cow' ? 0.5 : 0.9 });
   }
-  const sign = group(hw + 0.6, 0, g); box(0.1, 1.3, 0.1, 0x8a5a2b, 0, 0.65, 0, sign); box(1.1, 0.6, 0.08, 0xf3ead2, 0, 1.3, 0, sign);
+  const sign = group(hw + 0.6, 0, g); cap(0.07, 1.1, 0xb9794a, 0, 0.65, 0, sign); box(1.1, 0.6, 0.14, 0xfff6e0, 0, 1.3, 0, sign);
   sign.rotation.y = Math.PI / 2;
   const st = () => S.pens[key];
   things.push({
@@ -317,8 +378,8 @@ function makePen(key, x, z, w, d, count, maker, hutColor) {
   return { herd, hut, trough, key };
 }
 const penViews = [
-  makePen('coop', -16, -6, 7, 7, 3, chicken, 0xe8b04a),
-  makePen('cow', -16, 12, 8, 8, 2, cow, 0xc9463c),
+  makePen('coop', -16, -6, 7, 7, 3, chicken, 0xffd36a),
+  makePen('cow', -16, 12, 8, 8, 2, cow, 0xf2665a),
 ];
 
 // üretim binaları
@@ -327,15 +388,15 @@ function makeBuilding(key, x, z, wall, roofC) {
   const B = BLDS[key];
   const g = group(x, z);
   const body = new THREE.Group(); g.add(body);
-  box(5, 3, 4.4, wall, 0, 1.5, 0, body); roof(5, 2, 4.4, roofC, 3, body);
-  box(1.1, 1.9, 0.15, 0x8a5a2b, -2.52, 0.95, 0, body).rotation.y = Math.PI / 2;
-  box(0.15, 1, 1.1, 0x8ad0f0, -2.52, 1.9, 1.4, body); box(0.15, 1, 1.1, 0x8ad0f0, -2.52, 1.9, -1.4, body);
-  box(0.8, 1.8, 0.8, 0x9a8a80, 1.2, 4.2, 0.8, body);
-  const smoke = ball(0.4, new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }), 1.2, 5.6, 0.8, body);
+  box(5, 3, 4.4, wall, 0, 1.5, 0, body, 0.65); roof(5, 2, 4.4, roofC, 2.9, body);
+  box(0.3, 1.9, 1.2, 0xb9794a, -2.42, 0.95, 0, body, 0.55);
+  for (const wz of [-1.45, 1.45]) { box(0.3, 1.1, 1.0, 0xffffff, -2.4, 1.9, wz, body, 0.45); box(0.3, 0.8, 0.7, 0x9be0ff, -2.46, 1.9, wz, body, 0.33); }
+  box(0.8, 1.8, 0.8, 0xe8a58a, 1.2, 5.0, 0.8, body);
+  const smoke = ball(0.4, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }), 1.2, 6.2, 0.8, body);
   smoke.castShadow = false;
   const lot = new THREE.Group(); g.add(lot); // boş arsa
-  box(5, 0.08, 4.4, 0xb89a6a, 0, 0.04, 0, lot); box(0.12, 1.5, 0.12, 0x8a5a2b, -2.8, 0.75, 0, lot);
-  box(0.08, 0.7, 1.4, 0xf3ead2, -2.8, 1.5, 0, lot);
+  box(5, 0.16, 4.4, 0xe6c88c, 0, 0.04, 0, lot, 0.08); cap(0.08, 1.3, 0xb9794a, -2.8, 0.75, 0, lot);
+  box(0.14, 0.7, 1.4, 0xfff6e0, -2.8, 1.5, 0, lot);
   bldViews[key] = { body, lot, smoke };
   colliders.push({ x, z, r: 2.9, when: () => S.blds[key].built });
   const st = () => S.blds[key];
@@ -364,8 +425,8 @@ function makeBuilding(key, x, z, wall, roofC) {
     },
   });
 }
-makeBuilding('bakery', 17, -6, 0xf6dfae, 0xa8623a);
-makeBuilding('dairy', 17, 12, 0xdcefff, 0x3f78b5);
+makeBuilding('bakery', 17, -6, 0xffe3b0, 0xf29a4a);
+makeBuilding('dairy', 17, 12, 0xe6f4ff, 0x6fa8ef);
 function recipePanel(key) {
   const B = BLDS[key];
   openPanel(`${B.e} ${B.n}`, Object.entries(B.recipes).map(([k, r]) => {
@@ -378,10 +439,10 @@ function recipePanel(key) {
 // sipariş panosu
 {
   const g = group(6, 16.5);
-  for (const x of [-1.2, 1.2]) box(0.16, 2.2, 0.16, 0x8a5a2b, x, 1.1, 0, g);
-  box(2.8, 1.5, 0.12, 0xb98b55, 0, 1.6, 0, g);
+  for (const x of [-1.2, 1.2]) cap(0.1, 2.0, 0xb9794a, x, 1.1, 0, g);
+  box(2.9, 1.6, 0.2, 0xd9a86a, 0, 1.6, 0, g);
   [[-0.8, 1.85, 0xfff2a0], [0.1, 1.8, 0xffffff], [0.85, 1.9, 0xbfe8ff], [-0.4, 1.3, 0xffd0d0], [0.5, 1.25, 0xd8ffc8]]
-    .forEach(([x, y, c]) => box(0.6, 0.45, 0.04, c, x, y, -0.08, g));
+    .forEach(([x, y, c]) => { box(0.6, 0.45, 0.06, c, x, y, -0.12, g, 0.03); ball(0.05, 0xff5a4a, x, y + 0.16, -0.17, g); });
   colliders.push({ x: 6, z: 16.5, r: 1.2 });
   things.push({ x: 6, z: 15.3, r: 2.6, h: 2.8, label: () => '📋 Siparişler', action: () => ({ text: '📋 Siparişler', fn: orderPanel }) });
 }
@@ -423,9 +484,9 @@ function orderPanel() {
 // pazar tezgâhı
 {
   const g = group(-6, 16.5);
-  box(3, 0.9, 1.2, 0xb98b55, 0, 0.45, 0, g);
-  for (const x of [-1.4, 1.4]) box(0.12, 2.4, 0.12, 0x8a5a2b, x, 1.2, 0.5, g);
-  for (let i = 0; i < 5; i++) box(0.62, 0.1, 1.7, i % 2 ? 0xffffff : 0xe85b4f, -1.24 + i * 0.62, 2.4, 0.2, g);
+  box(3, 0.9, 1.2, 0xd9a86a, 0, 0.45, 0, g);
+  for (const x of [-1.4, 1.4]) cap(0.08, 2.2, 0xb9794a, x, 1.2, 0.5, g);
+  for (let i = 0; i < 5; i++) box(0.62, 0.22, 1.8, i % 2 ? 0xffffff : 0xff7d6a, -1.24 + i * 0.62, 2.4, 0.2, g, 0.11);
   ball(0.2, 0xf08a2c, -0.8, 1.05, 0, g); ball(0.2, 0xe8c64a, 0, 1.05, 0.1, g); ball(0.2, 0xd83a2a, 0.8, 1.05, 0, g);
   colliders.push({ x: -6, z: 16.5, r: 1.5 });
   things.push({ x: -6, z: 15.2, r: 2.6, h: 3, label: () => '🛒 Pazar tezgâhı', action: () => ({ text: '🛒 Sat', fn: stallPanel }) });
@@ -474,15 +535,23 @@ $('modal').addEventListener('pointerdown', (e) => { if (e.target === $('modal'))
 const player = group(S.px, S.pz);
 const limbs = {};
 {
-  const skin = 0xf2c79a, shirt = 0xe8563f, pants = 0x3d6fb5;
-  box(0.7, 0.8, 0.4, shirt, 0, 1.25, 0, player);
-  box(0.72, 0.3, 0.42, pants, 0, 0.82, 0, player);
-  ball(0.3, skin, 0, 1.95, 0, player);
-  cyl(0.55, 0.55, 0.05, 0xe8c66a, 0, 2.18, 0, player, 16); cyl(0.28, 0.32, 0.25, 0xe8c66a, 0, 2.3, 0, player, 16);
-  for (const [n, x, c, y, len] of [['la', -0.47, shirt, 1.6, 0.7], ['ra', 0.47, shirt, 1.6, 0.7], ['ll', -0.18, pants, 0.7, 0.7], ['rl', 0.18, pants, 0.7, 0.7]]) {
+  const skin = 0xffd9b3, shirt = 0xff7d6a, pants = 0x5b8def, straw = 0xffdf7a;
+  cap(0.36, 0.3, pants, 0, 0.92, 0, player);                       // tulum
+  box(0.5, 0.34, 0.1, pants, 0, 1.08, 0.33, player, 0.05);          // önlük
+  cap(0.34, 0.12, shirt, 0, 1.2, 0, player).scale.set(1, 1, 0.92);  // gömlek
+  ball(0.5, skin, 0, 1.9, 0, player);                               // kocaman kafa
+  eyes(player, 1.9, 0.45, 0.19, 0.075);
+  for (const x of [-0.31, 0.31]) ball(0.09, 0xffa0a8, x, 1.77, 0.37, player).scale.set(0.1, 0.06, 0.05);
+  ball(0.04, 0xe8a888, 0, 1.82, 0.5, player);
+  ball(0.5, 0x8a5a3a, 0, 1.95, -0.06, player).scale.set(0.52, 0.5, 0.5); // saç
+  cyl(0.82, 0.86, 0.07, straw, 0, 2.28, 0, player, 24);
+  const crown = mesh(domeGeo, straw, 0, 2.28, 0, player); crown.scale.set(0.95, 0.75, 0.95);
+  cyl(0.485, 0.485, 0.1, 0xff7d6a, 0, 2.36, 0, player, 24);
+  for (const [n, x, c, y, len] of [['la', -0.5, shirt, 1.32, 0.3], ['ra', 0.5, shirt, 1.32, 0.3], ['ll', -0.18, pants, 0.62, 0.22], ['rl', 0.18, pants, 0.62, 0.22]]) {
     const pv = new THREE.Group(); pv.position.set(x, y, 0); player.add(pv);
-    box(0.22, len, 0.24, c, 0, -len / 2, 0, pv);
-    if (n[1] === 'a') ball(0.13, skin, 0, -len - 0.05, 0, pv); else box(0.24, 0.14, 0.36, 0x5a3a20, 0, -len + 0.02, 0.06, pv);
+    const arm = n[1] === 'a';
+    cap(arm ? 0.12 : 0.15, len, c, 0, -len / 2 - 0.08, 0, pv);
+    if (arm) ball(0.13, skin, 0, -len - 0.24, 0, pv); else ball(0.2, 0x8a5a3a, 0, -len - 0.3, 0.06, pv).scale.set(0.19, 0.14, 0.26);
     limbs[n] = pv;
   }
 }
@@ -529,7 +598,7 @@ function changed() { fillOrders(); refreshHud(); syncWorld(); save(); }
 function syncWorld() {
   S.plots.forEach((p, i) => {
     const v = plotMeshes[i];
-    v.sign.visible = !p.open; v.soil.material.color.set(p.open ? 0x8a5a33 : 0x86b85a); v.plants.visible = !!p.crop;
+    v.sign.visible = !p.open; v.soil.material.color.set(p.open ? 0xb5784a : 0xa9d87a); v.sign.userData.furrows.visible = p.open; v.plants.visible = !!p.crop;
   });
   for (const v of penViews) { const b = S.pens[v.key].built; v.herd.visible = b; v.hut.visible = b; v.trough.visible = b; }
   for (const [k, v] of Object.entries(bldViews)) { v.body.visible = S.blds[k].built; v.lot.visible = !S.blds[k].built; }
@@ -581,10 +650,14 @@ function frame(t) {
   S.plots.forEach((pl, i) => {
     if (!pl.crop) return;
     const c = CROPS[pl.crop], g = Math.min(1, (T - pl.t0) / c.time), v = plotMeshes[i];
+    const cfg = PLANT[pl.crop], ripe = g >= 1;
     for (const m of v.plants.children) {
-      m.scale.set(0.5 + g * 0.7, 0.15 + g * 0.95, 0.5 + g * 0.7);
-      m.position.y = 0.16 + m.scale.y * 0.5 + (g >= 1 ? Math.abs(Math.sin(T * 3 + m.userData.ph)) * 0.08 : 0);
-      m.material.color.set(g >= 1 ? c.color : 0x66bb44);
+      const u = m.userData;
+      m.scale.setScalar(0.25 + g * 0.75);
+      u.stem.scale.y = cfg.stem; u.stem.position.y = cfg.stem * 0.55; u.leaf.position.y = cfg.stem * 0.45;
+      u.head.visible = g > 0.45; u.head.position.y = cfg.hy; u.head.scale.set(...cfg.hs);
+      u.head.material.color.set(ripe ? c.color : 0xa6dc6a);
+      m.rotation.z = ripe ? Math.sin(T * 3 + u.ph) * 0.12 : 0;
     }
   });
   // hayvanlar
@@ -598,10 +671,11 @@ function frame(t) {
       a.m.rotation.y = Math.atan2(dx, dz); a.m.position.y = Math.abs(Math.sin(T * 9)) * 0.04;
     }
   }
+  for (const cl of clouds) { cl.position.x += dt * 0.6; if (cl.position.x > 70) cl.position.x = -70; }
   // baca dumanı
   for (const [k, v] of Object.entries(bldViews)) {
     const busy = S.blds[k].rec && S.blds[k].t0 + BLDS[k].recipes[S.blds[k].rec].time > T;
-    v.smoke.visible = !!busy; if (busy) { const f = (T * 0.6) % 1; v.smoke.position.y = 5.4 + f * 1.6; v.smoke.scale.setScalar(0.6 + f); v.smoke.material.opacity = 0.7 * (1 - f); }
+    v.smoke.visible = !!busy; if (busy) { const f = (T * 0.6) % 1; v.smoke.position.y = 6.1 + f * 1.6; v.smoke.scale.setScalar(0.3 + f * 0.5); v.smoke.material.opacity = 0.7 * (1 - f); }
   }
 
   // en yakın etkileşim + etiketler
@@ -638,5 +712,5 @@ if (!localStorage.getItem(SAVE_KEY + '_hi')) {
   toast('👋 Hoş geldin! Tarlaya yürü, buğday ek, biç ve siparişleri teslim et.');
   try { localStorage.setItem(SAVE_KEY + '_hi', '1'); } catch (e) { /* özel sekme */ }
 }
-window.__farm = { get S() { return S; }, player, things };
+window.__farm = { get S() { return S; }, player, things, changed };
 requestAnimationFrame(frame);
